@@ -11,7 +11,7 @@ class DataPit
 {
 public:
     DataPit() : m_next_consumer_id(1) {}
-
+    
     template<typename T>
     bool produce(int queue_id, const T& data)
     {

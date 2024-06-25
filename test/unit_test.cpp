@@ -75,9 +75,10 @@ TEST(DataPit, test_produce_consume_multiple_consumers)
 TEST(DataPit, test_produce_consume_blocking)
 {
     DataPit dp;
-    auto consumer_id = dp.register_consumer(queue_1);
-    std::thread t([&dp, consumer_id]()
+
+    std::thread t([&dp]()
     {
+        auto consumer_id = dp.register_consumer(queue_1);
         auto result = dp.consume<int>(consumer_id, true);
         ASSERT_TRUE(result.has_value());
         ASSERT_EQ(42, result.value());
