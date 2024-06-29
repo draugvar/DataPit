@@ -52,7 +52,7 @@ public:
             return std::nullopt;
         }
 
-        auto queue_id = std::get<0>(m_consumer_indices[consumer_id]);
+        auto queue_id = std::get<0>(m_consumer_indices.at(consumer_id));
         // check if queue_id exists
         if (m_data_queues.find(queue_id) != m_data_queues.end())
         {
@@ -69,7 +69,7 @@ public:
             if(m_cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),
                            [&]()
                            {
-                                return std::get<1>(m_consumer_indices[consumer_id]) < m_data_queues[queue_id].size();
+                                return std::get<1>(m_consumer_indices.at(consumer_id)) < m_data_queues[queue_id].size();
                            }) == false)
             {
                 // unlock the mutex before returning
@@ -79,14 +79,14 @@ public:
                 return std::nullopt;
             }
         }
-        if (std::get<1>(m_consumer_indices[consumer_id]) >= m_data_queues[queue_id].size())
+        if (std::get<1>(m_consumer_indices.at(consumer_id)) >= m_data_queues[queue_id].size())
         {
             lock.unlock();
             set_last_error(consumer_id, data_pit_error::no_data_available);
             return std::nullopt;
         }
-        T data = std::any_cast<T>(m_data_queues[queue_id][std::get<1>(m_consumer_indices[consumer_id])]);
-        std::get<1>(m_consumer_indices[consumer_id])++;
+        T data = std::any_cast<T>(m_data_queues[queue_id][std::get<1>(m_consumer_indices.at(consumer_id))]);
+        std::get<1>(m_consumer_indices.at(consumer_id))++;
         return data;
     }
 
