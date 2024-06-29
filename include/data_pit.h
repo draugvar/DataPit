@@ -9,13 +9,16 @@
 #include <chrono>
 #include <typeindex>
 
+#define DATA_PIT_MAX_QUEUE_SIZE 1000
+
 enum class data_pit_error : int
 {
     success             = 0,
     consumer_not_found  = -1,
     timeout_expired     = -2,
     no_data_available   = -3,
-    type_mismatch       = -4
+    type_mismatch       = -4,
+    queue_is_full       = -5
 };
 
 class data_pit
@@ -27,27 +30,30 @@ public:
     }
     
     template<typename T>
-    bool produce(int queue_id, const T& data)
+    data_pit_error produce(int queue_id, const T& data)
     {
-        std::lock_guard lock(m_mtx);
+        std::unique_lock global_lock(m_mtx);
         // check if the type is already registered and is the same
         if (m_data_queues.contains(queue_id))
         {
-            if(get_type(queue_id) != std::type_index(typeid(T)).name())
+            if(!get_queue(queue_id).empty() && get_type(queue_id) != std::type_index(typeid(T)).name())
             {
-                std::cout << get_type(queue_id) << " != " << std::type_index(typeid(T)).name() << std::endl;
-                set_last_error(0, data_pit_error::type_mismatch);
-                return false;
+                return data_pit_error::type_mismatch;
             }
         }
         else
         {
-            m_data_queues[queue_id];
+            init_queue(queue_id);
         }
+        std::lock_guard lock(get_mutex(queue_id));
+        global_lock.unlock();
+
+        if (get_queue(queue_id).size() >= get_queue_size(queue_id)) return data_pit_error::queue_is_full;
+
         get_type(queue_id) = std::type_index(typeid(T)).name();
         get_queue(queue_id).push_back(data);
         get_cv(queue_id).notify_all();
-        return true;
+        return data_pit_error::success;
     }
 
     template<typename T>
@@ -76,19 +82,23 @@ public:
         }
         else
         {
-            std::get<1>(m_data_queues[queue_id]) = std::type_index(typeid(T)).name();
+            init_queue(queue_id);
+            get_type(queue_id) = std::type_index(typeid(T)).name();
         }
+
+        std::unique_lock queue_lock(get_mutex(queue_id));
+        lock.unlock();
 
         if (blocking)
         {
-            if(get_cv(queue_id).wait_for(lock, std::chrono::milliseconds(timeout_ms),
+            if(get_cv(queue_id).wait_for(queue_lock, std::chrono::milliseconds(timeout_ms),
                            [&]()
                            {
                                 return std::get<1>(m_consumer_indices.at(consumer_id)) < get_queue(queue_id).size();
                            }) == false)
             {
                 // unlock the mutex before returning
-                lock.unlock();
+                queue_lock.unlock();
                 // Timeout expired.
                 set_last_error(consumer_id, data_pit_error::timeout_expired);
                 return std::nullopt;
@@ -96,7 +106,7 @@ public:
         }
         if (std::get<1>(m_consumer_indices.at(consumer_id)) >= get_queue(queue_id).size())
         {
-            lock.unlock();
+            queue_lock.unlock();
             set_last_error(consumer_id, data_pit_error::no_data_available);
             return std::nullopt;
         }
@@ -140,6 +150,13 @@ public:
         std::get<1>(m_consumer_indices[consumer_id]) = 0;
     }
 
+    void set_queue_size(int queue_id, size_t size)
+    {
+        std::lock_guard lock(m_mtx);
+        init_queue(queue_id);
+        get_queue_size(queue_id) = size;
+    }
+
     data_pit_error get_last_error(unsigned int consumer_id)
     {
         std::lock_guard lock(m_mtx);
@@ -163,9 +180,21 @@ private:
         m_consumer_last_error[consumer_id] = error;
     }
 
+    inline void init_queue(int queue_id)
+    {
+        auto&[vector, size] = std::get<0>(m_data_queues[queue_id]);
+        vector.clear();
+        size = DATA_PIT_MAX_QUEUE_SIZE;
+    }
+
     inline std::vector<std::any>& get_queue(int queue_id)
     {
-        return std::get<0>(m_data_queues.at(queue_id));
+        return std::get<0>(m_data_queues.at(queue_id)).first;
+    }
+
+    inline size_t& get_queue_size(int queue_id)
+    {
+        return std::get<0>(m_data_queues.at(queue_id)).second;
     }
 
     inline std::string& get_type(int queue_id)
@@ -183,7 +212,7 @@ private:
         return std::get<3>(m_data_queues.at(queue_id));
     }
 
-    typedef std::tuple<std::vector<std::any>, std::string, std::mutex, std::condition_variable> data;
+    typedef std::tuple<std::pair<std::vector<std::any>, size_t>, std::string, std::mutex, std::condition_variable> data;
 
     std::unordered_map<int, data> m_data_queues;
     std::unordered_map<unsigned int, std::tuple<int, size_t>> m_consumer_indices;

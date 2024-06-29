@@ -223,6 +223,81 @@ TEST(data_pit, test_produce_consume_reference)
     ASSERT_EQ(message, 42);
 }
 
+TEST(data_pit, test_reset_index)
+{
+    data_pit dp;
+    auto consumer_id = dp.register_consumer(queue_1);
+    for(auto i = 0; i < 100; ++i)
+    {
+        dp.produce(queue_1, i);
+    }
+    // consume 50 messages
+    for(auto i = 0; i < 50; ++i)
+    {
+        auto result = dp.consume<int>(consumer_id);
+        ASSERT_TRUE(result.has_value());
+        ASSERT_EQ(i, result.value());
+    }
+    dp.reset_consumer(consumer_id);
+    auto result = dp.consume<int>(consumer_id);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(0, result.value());
+}
+
+TEST(data_pit, test_set_queue_size)
+{
+    data_pit dp;
+    dp.set_queue_size(queue_1, 10);
+    auto consumer_id = dp.register_consumer(queue_1);
+    for(auto i = 0; i < 100; ++i)
+    {
+        auto ret = dp.produce(queue_1, i);
+        if(i >= 10)
+        {
+            ASSERT_EQ(data_pit_error::queue_is_full, ret);
+        }
+    }
+    // consume 10 messages
+    for(auto i = 0; i < 10; ++i)
+    {
+        auto result = dp.consume<int>(consumer_id);
+        ASSERT_TRUE(result.has_value());
+        ASSERT_EQ(i, result.value());
+    }
+    auto result = dp.consume<int>(consumer_id);
+    ASSERT_FALSE(result.has_value());
+}
+
+TEST(data_pit, test_clear_queue)
+{
+    data_pit dp;
+    auto consumer_id = dp.register_consumer(queue_1);
+    for(auto i = 0; i < 100; ++i)
+    {
+        dp.produce(queue_1, i);
+    }
+    dp.clear_queue(queue_1);
+    auto result = dp.consume<int>(consumer_id);
+    ASSERT_FALSE(result.has_value());
+}
+
+TEST(data_pit, test_clear_all_queues)
+{
+    data_pit dp;
+    auto consumer_id = dp.register_consumer(queue_1);
+    auto consumer_id_2 = dp.register_consumer(queue_2);
+    for(auto i = 0; i < 100; ++i)
+    {
+        dp.produce(queue_1, i);
+        dp.produce(queue_2, i);
+    }
+    dp.clear_all_queues();
+    auto result1 = dp.consume<int>(consumer_id);
+    auto result2 = dp.consume<int>(consumer_id_2);
+    ASSERT_FALSE(result1.has_value());
+    ASSERT_FALSE(result2.has_value());
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
