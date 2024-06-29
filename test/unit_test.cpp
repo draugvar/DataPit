@@ -171,6 +171,17 @@ TEST(DataPit, test_consume_before_register)
     std::cout << dp.get_last_error(1) << std::endl;
 }
 
+TEST(DataPit, test_produce_wrong_type)
+{
+    DataPit dp;
+    int message = 0;
+    dp.produce(queue_1, std::ref(message));
+    auto consumer_id = dp.register_consumer(queue_1);
+    auto result = dp.consume<int>(consumer_id);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(0, result.value());
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
