@@ -186,7 +186,7 @@ TEST(DataPit, test_produce_consume_error_reference)
     DataPit dp;
     int message = 0;
     dp.produce(queue_1, &message);
-    auto consumer_id = dp.register_consumer(queue_2);
+    auto consumer_id = dp.register_consumer(queue_1);
     auto result = dp.consume<int>(consumer_id);
     ASSERT_FALSE(result.has_value());
 }
@@ -196,7 +196,7 @@ TEST(DataPit, test_produce_consume_reference)
     DataPit dp;
     int message = 0;
     dp.produce(queue_1, &message);
-    auto consumer_id = dp.register_consumer(queue_2);
+    auto consumer_id = dp.register_consumer(queue_1);
     auto result = dp.consume<int*>(consumer_id);
     ASSERT_TRUE(result.has_value());
     auto message_consume = result.value();
