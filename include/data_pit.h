@@ -1,3 +1,5 @@
+#pragma once
+
 #include <queue>
 #include <unordered_map>
 #include <mutex>
@@ -7,10 +9,19 @@
 #include <chrono>
 #include <typeindex>
 
-class DataPit
+enum class data_pit_error : int
+{
+    success             = 0,
+    consumer_not_found  = -1,
+    timeout_expired     = -2,
+    no_data_available   = -3,
+    type_mismatch       = -4
+};
+
+class data_pit
 {
 public:
-    DataPit() : m_next_consumer_id(1) {}
+    data_pit() : m_next_consumer_id(1) {}
     
     template<typename T>
     bool produce(int queue_id, const T& data)
@@ -37,7 +48,7 @@ public:
         if (!m_consumer_indices.contains(consumer_id))
         {
             lock.unlock();
-            set_last_error(consumer_id, "Consumer not found");
+            set_last_error(consumer_id, data_pit_error::consumer_not_found);
             return std::nullopt;
         }
 
@@ -48,7 +59,7 @@ public:
             if(m_data_types[queue_id] != std::type_index(typeid(T)).name())
             {
                 lock.unlock();
-                set_last_error(consumer_id, "Type mismatch");
+                set_last_error(consumer_id, data_pit_error::type_mismatch);
                 return std::nullopt;
             }
         }
@@ -64,14 +75,14 @@ public:
                 // unlock the mutex before returning
                 lock.unlock();
                 // Timeout expired.
-                set_last_error(consumer_id, "Timeout expired");
+                set_last_error(consumer_id, data_pit_error::timeout_expired);
                 return std::nullopt;
             }
         }
         if (std::get<1>(m_consumer_indices[consumer_id]) >= m_data_queues[queue_id].size())
         {
             lock.unlock();
-            set_last_error(consumer_id, "No data available");
+            set_last_error(consumer_id, data_pit_error::no_data_available);
             return std::nullopt;
         }
         T data = std::any_cast<T>(m_data_queues[queue_id][std::get<1>(m_consumer_indices[consumer_id])]);
@@ -87,34 +98,33 @@ public:
         return consumer_id;
     }
 
-    std::string get_last_error(unsigned int consumer_id)
+    data_pit_error get_last_error(unsigned int consumer_id)
     {
         std::lock_guard lock(m_mtx);
         // check if consumer_id exists
         if (m_consumer_indices.find(consumer_id) == m_consumer_indices.end())
         {
-            return "Consumer not found";
+            return data_pit_error::consumer_not_found;
         }
         return m_consumer_last_error[consumer_id];
     }
 
 private:
 
-    void set_last_error(unsigned int consumer_id, const std::string& error)
+    void set_last_error(unsigned int consumer_id, data_pit_error error)
     {
         std::lock_guard lock(m_mtx);
+
         // check if consumer_id exists
-        if (m_consumer_indices.find(consumer_id) == m_consumer_indices.end())
-        {
-            return;
-        }
+        if (m_consumer_indices.find(consumer_id) == m_consumer_indices.end()) return;
+
         m_consumer_last_error[consumer_id] = error;
     }
 
     std::unordered_map<int, std::vector<std::any>> m_data_queues;
     std::unordered_map<unsigned int, std::tuple<int, size_t>> m_consumer_indices;
     std::unordered_map<int, std::string> m_data_types;
-    std::unordered_map<unsigned int, std::string> m_consumer_last_error;
+    std::unordered_map<unsigned int, data_pit_error> m_consumer_last_error;
     std::mutex m_mtx;
     std::condition_variable m_cv;
     unsigned int m_next_consumer_id;

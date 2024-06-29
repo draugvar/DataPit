@@ -3,7 +3,7 @@
 //
 #include <gtest/gtest.h>
 #include <thread>
-#include <DataPit.h>
+#include <data_pit.h>
 
 enum queue_id
 {
@@ -11,9 +11,28 @@ enum queue_id
     queue_2
 };
 
-TEST(DataPit, test_produce_consume)
+std::string error_to_string(data_pit_error error)
 {
-    DataPit dp;
+    switch (error)
+    {
+    case data_pit_error::success:
+        return "success";
+    case data_pit_error::timeout_expired:
+        return "timeout_expired";
+    case data_pit_error::no_data_available:
+        return "no_data_available";
+    case data_pit_error::consumer_not_found:
+        return "consumer_not_found";
+    case data_pit_error::type_mismatch:
+        return "type_mismatch";
+    default:
+        return "unknown";
+    }
+}
+
+TEST(data_pit, test_produce_consume)
+{
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_1);
     int data = 42;
     dp.produce(queue_1, data);
@@ -22,9 +41,9 @@ TEST(DataPit, test_produce_consume)
     ASSERT_EQ(data, result.value());
 }
 
-TEST(DataPit, test_produce_consume_multiple)
+TEST(data_pit, test_produce_consume_multiple)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_1);
     int data1 = 42;
     int data2 = 43;
@@ -38,9 +57,9 @@ TEST(DataPit, test_produce_consume_multiple)
     ASSERT_EQ(data2, result2.value());
 }
 
-TEST(DataPit, test_produce_consume_multiple_queues)
+TEST(data_pit, test_produce_consume_multiple_queues)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id_1 = dp.register_consumer(queue_1);
     auto consumer_id_2 = dp.register_consumer(queue_2);
     int data1 = 42;
@@ -55,9 +74,9 @@ TEST(DataPit, test_produce_consume_multiple_queues)
     ASSERT_EQ(data2, result2.value());
 }
 
-TEST(DataPit, test_produce_consume_multiple_consumers)
+TEST(data_pit, test_produce_consume_multiple_consumers)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id1 = dp.register_consumer(queue_1);
     auto consumer_id2 = dp.register_consumer(queue_1);
     int data1 = 42;
@@ -72,9 +91,9 @@ TEST(DataPit, test_produce_consume_multiple_consumers)
     ASSERT_EQ(data1, result2.value());
 }
 
-TEST(DataPit, test_produce_consume_blocking)
+TEST(data_pit, test_produce_consume_blocking)
 {
-    DataPit dp;
+    data_pit dp;
 
     std::thread t([&dp]()
     {
@@ -94,46 +113,46 @@ TEST(DataPit, test_produce_consume_blocking)
     t.join();
 }
 
-TEST(DataPit, test_produce_consume_blocking_timeout)
+TEST(data_pit, test_produce_consume_blocking_timeout)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_1);
     auto result = dp.consume<int>(consumer_id, true, 100);
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(DataPit, test_produce_consume_wrong_type)
+TEST(data_pit, test_produce_consume_wrong_type)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_1);
     dp.produce(queue_1, 42);
     auto result = dp.consume<float>(consumer_id);
     ASSERT_FALSE(result.has_value());
-    std::cout << dp.get_last_error(consumer_id) << std::endl;
+    std::cout << error_to_string(dp.get_last_error(consumer_id)) << std::endl;
 }
 
-TEST(DataPit, test_produce_consume_wrong_queue)
+TEST(data_pit, test_produce_consume_wrong_queue)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_2);
     dp.produce(queue_1, 42);
     auto result = dp.consume<int>(consumer_id);
     ASSERT_FALSE(result.has_value());
-    std::cout << dp.get_last_error(consumer_id) << std::endl;
+    std::cout << error_to_string(dp.get_last_error(consumer_id)) << std::endl;
 }
 
-TEST(DataPit, test_produce_consume_no_data)
+TEST(data_pit, test_produce_consume_no_data)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_1);
     auto result = dp.consume<int>(consumer_id);
     ASSERT_FALSE(result.has_value());
-    std::cout << dp.get_last_error(consumer_id) << std::endl;
+    std::cout << error_to_string(dp.get_last_error(consumer_id)) << std::endl;
 }
 
-TEST(DataPit, test_produce_consume_no_data_blocking_timeout_thread)
+TEST(data_pit, test_produce_consume_no_data_blocking_timeout_thread)
 {
-    DataPit dp;
+    data_pit dp;
 
     std::thread t([&dp]()
     {
@@ -145,35 +164,35 @@ TEST(DataPit, test_produce_consume_no_data_blocking_timeout_thread)
     t.join();
 }
 
-TEST(DataPit, test_produce_consume_no_data_blocking_timeout)
+TEST(data_pit, test_produce_consume_no_data_blocking_timeout)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_1);
     auto result = dp.consume<int>(consumer_id, true, 100);
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(DataPit, test_produce_consume_mismatched_type)
+TEST(data_pit, test_produce_consume_mismatched_type)
 {
-    DataPit dp;
+    data_pit dp;
     auto consumer_id = dp.register_consumer(queue_1);
     dp.produce(queue_1, 42);
     auto result = dp.consume<float>(consumer_id);
     ASSERT_FALSE(result.has_value());
-    std::cout << dp.get_last_error(consumer_id) << std::endl;
+    std::cout << error_to_string(dp.get_last_error(consumer_id)) << std::endl;
 }
 
-TEST(DataPit, test_consume_before_register)
+TEST(data_pit, test_consume_before_register)
 {
-    DataPit dp;
+    data_pit dp;
     auto result = dp.consume<int>(1);
     ASSERT_FALSE(result.has_value());
-    std::cout << dp.get_last_error(1) << std::endl;
+    std::cout << error_to_string(dp.get_last_error(1)) << std::endl;
 }
 
-TEST(DataPit, test_produce_wrong_type)
+TEST(data_pit, test_produce_wrong_type)
 {
-    DataPit dp;
+    data_pit dp;
     int message = 0;
     dp.produce(queue_1, std::ref(message));
     auto consumer_id = dp.register_consumer(queue_1);
@@ -181,9 +200,9 @@ TEST(DataPit, test_produce_wrong_type)
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(DataPit, test_produce_consume_error_reference)
+TEST(data_pit, test_produce_consume_error_reference)
 {
-    DataPit dp;
+    data_pit dp;
     int message = 0;
     dp.produce(queue_1, &message);
     auto consumer_id = dp.register_consumer(queue_1);
@@ -191,9 +210,9 @@ TEST(DataPit, test_produce_consume_error_reference)
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(DataPit, test_produce_consume_reference)
+TEST(data_pit, test_produce_consume_reference)
 {
-    DataPit dp;
+    data_pit dp;
     int message = 0;
     dp.produce(queue_1, &message);
     auto consumer_id = dp.register_consumer(queue_1);
