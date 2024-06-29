@@ -178,8 +178,7 @@ TEST(DataPit, test_produce_wrong_type)
     dp.produce(queue_1, std::ref(message));
     auto consumer_id = dp.register_consumer(queue_1);
     auto result = dp.consume<int>(consumer_id);
-    ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(0, result.value());
+    ASSERT_FALSE(result.has_value());
 }
 
 int main(int argc, char **argv)
