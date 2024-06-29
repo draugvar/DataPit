@@ -74,8 +74,10 @@ public:
                 return std::nullopt;
             }
         }
-
-        std::get<1>(m_data_queues[queue_id]) = std::type_index(typeid(T)).name();
+        else
+        {
+            std::get<1>(m_data_queues[queue_id]) = std::type_index(typeid(T)).name();
+        }
 
         if (blocking)
         {
