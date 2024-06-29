@@ -30,6 +30,12 @@ std::string error_to_string(data_pit_error error)
     }
 }
 
+TEST(data_pit, test_version)
+{
+    printf("data_pit version: %d.%d.%d\n", DATA_PIT_VERSION_MAJOR, DATA_PIT_VERSION_MINOR, DATA_PIT_VERSION_PATCH);
+    printf("data_pit version hex: %.6x\n", DATA_PIT_VERSION);
+}
+
 TEST(data_pit, test_produce_consume)
 {
     data_pit dp;

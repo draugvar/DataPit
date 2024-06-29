@@ -9,6 +9,11 @@
 #include <chrono>
 #include <typeindex>
 
+#define DATA_PIT_VERSION_MAJOR 1
+#define DATA_PIT_VERSION_MINOR 0
+#define DATA_PIT_VERSION_PATCH 0
+#define DATA_PIT_VERSION (DATA_PIT_VERSION_MAJOR << 16 | DATA_PIT_VERSION_MINOR << 8 | DATA_PIT_VERSION_PATCH)
+
 #define DATA_PIT_MAX_QUEUE_SIZE 1000
 
 enum class data_pit_error : int
