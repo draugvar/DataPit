@@ -123,7 +123,8 @@ public:
     unsigned int register_consumer(int queue_id)
     {
         std::lock_guard lock(m_mtx);
-        unsigned int consumer_id = m_next_consumer_id++;
+        unsigned int consumer_id = register_id();
+        if(consumer_id == 0) return 0;
         m_consumer_indices[consumer_id] = std::make_tuple(queue_id, 0);
         return consumer_id;
     }
@@ -133,6 +134,7 @@ public:
         std::lock_guard lock(m_mtx);
         m_consumer_indices.erase(consumer_id);
         m_consumer_last_error.erase(consumer_id);
+        unregister_id(consumer_id);
     }
 
     void clear_queue(int queue_id)
@@ -217,11 +219,36 @@ private:
         return std::get<3>(m_data_queues.at(queue_id));
     }
 
+    unsigned int register_id()
+    {
+        std::lock_guard lock(m_mtx);
+        unsigned int consumer_id;
+        if (!released_ids.empty())
+        {
+            consumer_id = released_ids.front();
+            released_ids.pop();
+        }
+        else
+        {
+            if(m_next_consumer_id == std::numeric_limits<unsigned int>::max()) return 0;
+
+            consumer_id = m_next_consumer_id++;
+        }
+        return consumer_id;
+    }
+
+    void unregister_id(unsigned int consumer_id)
+    {
+        std::lock_guard lock(m_mtx);
+        released_ids.push(consumer_id);
+    }
+
     typedef std::tuple<std::pair<std::vector<std::any>, size_t>, std::string, std::mutex, std::condition_variable> data;
 
     std::unordered_map<int, data> m_data_queues;
     std::unordered_map<unsigned int, std::tuple<int, size_t>> m_consumer_indices;
     std::unordered_map<unsigned int, data_pit_error> m_consumer_last_error;
-    std::mutex m_mtx;
+    std::recursive_mutex m_mtx;
     unsigned int m_next_consumer_id;
+    std::queue<unsigned int> released_ids;
 };

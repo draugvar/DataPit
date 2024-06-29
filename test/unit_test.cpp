@@ -304,6 +304,35 @@ TEST(data_pit, test_clear_all_queues)
     ASSERT_FALSE(result2.has_value());
 }
 
+TEST(data_pit, test_unregister_consumer)
+{
+    data_pit dp;
+    auto consumer_id = dp.register_consumer(queue_1);
+    for(auto i = 0; i < 100; ++i)
+    {
+        dp.produce(queue_1, i);
+    }
+    dp.unregister_consumer(consumer_id);
+    auto result = dp.consume<int>(consumer_id);
+    ASSERT_FALSE(result.has_value());
+}
+
+TEST(data_pit, test_produce_consume_error)
+{
+    data_pit dp;
+    auto consumer_id = dp.register_consumer(queue_1);
+    ASSERT_EQ(consumer_id, 1);
+    for(auto i = 0; i < 100; ++i)
+    {
+        dp.produce(queue_1, i);
+    }
+    dp.unregister_consumer(consumer_id);
+    consumer_id = dp.register_consumer(queue_1);
+    ASSERT_EQ(consumer_id, 1);
+    auto result = dp.consume<int>(consumer_id);
+    ASSERT_TRUE(result.has_value());
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
