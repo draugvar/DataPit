@@ -83,7 +83,7 @@ public:
         // Check if the queue with the given ID already exists and if the type of the data matches
         if (m_queues_data.contains(queue_id))
         {
-            if(!get_queue(queue_id).empty() && get_type(queue_id) != std::type_index(typeid(T)).name())
+            if(!queue(queue_id).empty() && get_type(queue_id) != std::type_index(typeid(T)).name())
             {
                 // If the type of the data does not match, return a type mismatch error
                 return data_pit_result::type_mismatch;
@@ -102,27 +102,37 @@ public:
         global_lock.unlock();
 
         // If the queue is full, return a queue is full error
-        if (get_queue(queue_id).size() >= get_queue_size(queue_id)) return data_pit_result::queue_is_full;
+        if (queue(queue_id).size() >= get_queue_size(queue_id)) return data_pit_result::queue_is_full;
 
         // Set the type of the data for the queue
         get_type(queue_id) = std::type_index(typeid(T)).name();
 
         // Add the data to the queue
-        get_queue(queue_id).push_back(data);
+        queue(queue_id).push_back(data);
 
         // Notify all waiting threads that new data has been added
-        get_cv(queue_id).notify_all();
+        queue_cv(queue_id).notify_all();
 
         // Return success
         return data_pit_result::success;
     }
 
+    /**
+ * @brief               This function is used to consume data from the queue
+ * @tparam  T           The type of data to be consumed
+ * @param   consumer_id The ID of the consumer
+ * @param   blocking    If true, the function will wait until there are data available
+ * @param   timeout_ms  The maximum waiting time in milliseconds
+ * @return              The consumed data, or std::nullopt if no data are available
+ */
     template<typename T>
     std::optional<T> consume(unsigned int consumer_id, bool blocking = false,
                              uint32_t timeout_ms = std::numeric_limits<uint32_t>::max())
     {
+        // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
-        // check if consumer_id exists
+
+        // Check if the consumer_id exists
         if (!m_consumers_data.contains(consumer_id))
         {
             lock.unlock();
@@ -131,7 +141,8 @@ public:
         }
 
         auto queue_id = std::get<0>(m_consumers_data.at(consumer_id));
-        // check if queue_id exists
+
+        // Check if the queue_id exists
         if (m_queues_data.contains(queue_id))
         {
             if(get_type(queue_id) != std::type_index(typeid(T)).name())
@@ -147,32 +158,45 @@ public:
             get_type(queue_id) = std::type_index(typeid(T)).name();
         }
 
+        // Lock the mutex for the specific queue
         std::unique_lock queue_lock(get_mutex(queue_id));
+
+        // Unlock the global mutex
         lock.unlock();
 
+        // If blocking is true, wait until there are data available
         if (blocking)
         {
-            if(get_cv(queue_id).wait_for(queue_lock, std::chrono::milliseconds(timeout_ms),
-                           [&]()
-                           {
-                                return std::get<1>(m_consumers_data.at(consumer_id)) < get_queue(queue_id).size();
-                           }) == false)
+            if(queue_cv(queue_id).wait_for(queue_lock, std::chrono::milliseconds(timeout_ms),
+                                           [&]()
+                                         {
+                                             return std::get<1>(m_consumers_data.at(consumer_id)) < queue(queue_id).size();
+                                         }) == false)
             {
-                // unlock the mutex before returning
+                // Unlock the mutex before returning
                 queue_lock.unlock();
-                // Timeout expired.
+
+                // Timeout expired
                 set_last_error(consumer_id, data_pit_result::timeout_expired);
                 return std::nullopt;
             }
         }
-        if (std::get<1>(m_consumers_data.at(consumer_id)) >= get_queue(queue_id).size())
+
+        // If there are no data available, return std::nullopt
+        if (std::get<1>(m_consumers_data.at(consumer_id)) >= queue(queue_id).size())
         {
             queue_lock.unlock();
             set_last_error(consumer_id, data_pit_result::no_data_available);
             return std::nullopt;
         }
-        T data = std::any_cast<T>(get_queue(queue_id)[std::get<1>(m_consumers_data.at(consumer_id))]);
-        std::get<1>(m_consumers_data.at(consumer_id))++;
+
+        // Fetch the data from the queue
+        T data = std::any_cast<T>(queue(queue_id)[std::get<1>(m_consumers_data.at(consumer_id))]);
+
+        // Increment the consumer's index
+        consumer_index(consumer_id)++;
+
+        // Return the data
         return data;
     }
 
@@ -195,7 +219,7 @@ public:
     void clear_queue(int queue_id)
     {
         std::lock_guard lock(m_mtx);
-        get_queue(queue_id).clear();
+        queue(queue_id).clear();
     }
 
     void clear_all_queues()
@@ -227,7 +251,7 @@ public:
         {
             return data_pit_result::consumer_not_found;
         }
-        return get_data_pit_error(consumer_id);
+        return data_pit_error(consumer_id);
     }
 
 private:
@@ -239,7 +263,7 @@ private:
         // check if consumer_id exists
         if (m_consumers_data.find(consumer_id) == m_consumers_data.end()) return;
 
-        get_data_pit_error(consumer_id) = error;
+        data_pit_error(consumer_id) = error;
     }
 
     inline void init_queue(int queue_id)
@@ -249,7 +273,7 @@ private:
         size = DATA_PIT_MAX_QUEUE_SIZE;
     }
 
-    inline std::vector<std::any>& get_queue(int queue_id)
+    inline std::vector<std::any>& queue(int queue_id)
     {
         return std::get<0>(m_queues_data.at(queue_id)).first;
     }
@@ -269,12 +293,17 @@ private:
         return std::get<2>(m_queues_data.at(queue_id));
     }
 
-    inline std::condition_variable& get_cv(int queue_id)
+    inline std::condition_variable& queue_cv(int queue_id)
     {
         return std::get<3>(m_queues_data.at(queue_id));
     }
 
-    inline data_pit_result& get_data_pit_error(unsigned int consumer_id)
+    inline size_t& consumer_index(unsigned int consumer_id)
+    {
+        return std::get<1>(m_consumers_data.at(consumer_id));
+    }
+
+    inline data_pit_result& data_pit_error(unsigned int consumer_id)
     {
         return std::get<2>(m_consumers_data.at(consumer_id));
     }
