@@ -11,19 +11,19 @@ enum queue_id
     queue_2
 };
 
-std::string error_to_string(data_pit_error error)
+std::string error_to_string(data_pit_result error)
 {
     switch (error)
     {
-    case data_pit_error::success:
+    case data_pit_result::success:
         return "success";
-    case data_pit_error::timeout_expired:
+    case data_pit_result::timeout_expired:
         return "timeout_expired";
-    case data_pit_error::no_data_available:
+    case data_pit_result::no_data_available:
         return "no_data_available";
-    case data_pit_error::consumer_not_found:
+    case data_pit_result::consumer_not_found:
         return "consumer_not_found";
-    case data_pit_error::type_mismatch:
+    case data_pit_result::type_mismatch:
         return "type_mismatch";
     default:
         return "unknown";
@@ -260,7 +260,7 @@ TEST(data_pit, test_set_queue_size)
         auto ret = dp.produce(queue_1, i);
         if(i >= 10)
         {
-            ASSERT_EQ(data_pit_error::queue_is_full, ret);
+            ASSERT_EQ(data_pit_result::queue_is_full, ret);
         }
     }
     // consume 10 messages

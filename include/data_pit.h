@@ -1,3 +1,27 @@
+/*
+ *  data_pit.h
+ *  data_pit
+ *
+ *  Copyright (c) 2024 Salvatore Rivieccio. All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 #pragma once
 
 #include <queue>
@@ -16,7 +40,10 @@
 
 #define DATA_PIT_MAX_QUEUE_SIZE 1000
 
-enum class data_pit_error : int
+/**
+ * @brief data_pit_result enum class
+ */
+enum class data_pit_result : int
 {
     success             = 0,
     consumer_not_found  = -1,
@@ -26,39 +53,68 @@ enum class data_pit_error : int
     queue_is_full       = -5
 };
 
+/**
+ * @brief data_pit class
+ */
 class data_pit
 {
 public:
+    /**
+     * @brief Constructor
+     */
     data_pit() : m_next_consumer_id(1)
     {
         m_queues_data.clear();
     }
-    
+
+    /**
+     * @brief               This function is used to produce data in the queue
+     * @tparam  T           The type of the data to be produced
+     * @param   queue_id    The id of the queue
+     * @param   data        The data to be produced
+     * @return              The result of the operation
+     */
     template<typename T>
-    data_pit_error produce(int queue_id, const T& data)
+    data_pit_result produce(int queue_id, const T& data)
     {
+        // Lock the mutex to ensure thread safety
         std::unique_lock global_lock(m_mtx);
-        // check if the type is already registered and is the same
+
+        // Check if the queue with the given ID already exists and if the type of the data matches
         if (m_queues_data.contains(queue_id))
         {
             if(!get_queue(queue_id).empty() && get_type(queue_id) != std::type_index(typeid(T)).name())
             {
-                return data_pit_error::type_mismatch;
+                // If the type of the data does not match, return a type mismatch error
+                return data_pit_result::type_mismatch;
             }
         }
         else
         {
+            // If the queue does not exist, initialize it
             init_queue(queue_id);
         }
+
+        // Lock the mutex for the specific queue
         std::lock_guard lock(get_mutex(queue_id));
+
+        // Unlock the global mutex
         global_lock.unlock();
 
-        if (get_queue(queue_id).size() >= get_queue_size(queue_id)) return data_pit_error::queue_is_full;
+        // If the queue is full, return a queue is full error
+        if (get_queue(queue_id).size() >= get_queue_size(queue_id)) return data_pit_result::queue_is_full;
 
+        // Set the type of the data for the queue
         get_type(queue_id) = std::type_index(typeid(T)).name();
+
+        // Add the data to the queue
         get_queue(queue_id).push_back(data);
+
+        // Notify all waiting threads that new data has been added
         get_cv(queue_id).notify_all();
-        return data_pit_error::success;
+
+        // Return success
+        return data_pit_result::success;
     }
 
     template<typename T>
@@ -70,7 +126,7 @@ public:
         if (!m_consumers_data.contains(consumer_id))
         {
             lock.unlock();
-            set_last_error(consumer_id, data_pit_error::consumer_not_found);
+            set_last_error(consumer_id, data_pit_result::consumer_not_found);
             return std::nullopt;
         }
 
@@ -81,7 +137,7 @@ public:
             if(get_type(queue_id) != std::type_index(typeid(T)).name())
             {
                 lock.unlock();
-                set_last_error(consumer_id, data_pit_error::type_mismatch);
+                set_last_error(consumer_id, data_pit_result::type_mismatch);
                 return std::nullopt;
             }
         }
@@ -105,14 +161,14 @@ public:
                 // unlock the mutex before returning
                 queue_lock.unlock();
                 // Timeout expired.
-                set_last_error(consumer_id, data_pit_error::timeout_expired);
+                set_last_error(consumer_id, data_pit_result::timeout_expired);
                 return std::nullopt;
             }
         }
         if (std::get<1>(m_consumers_data.at(consumer_id)) >= get_queue(queue_id).size())
         {
             queue_lock.unlock();
-            set_last_error(consumer_id, data_pit_error::no_data_available);
+            set_last_error(consumer_id, data_pit_result::no_data_available);
             return std::nullopt;
         }
         T data = std::any_cast<T>(get_queue(queue_id)[std::get<1>(m_consumers_data.at(consumer_id))]);
@@ -125,7 +181,7 @@ public:
         std::lock_guard lock(m_mtx);
         unsigned int consumer_id = register_id();
         if(consumer_id == 0) return 0;
-        m_consumers_data[consumer_id] = std::make_tuple(queue_id, 0, data_pit_error::success);
+        m_consumers_data[consumer_id] = std::make_tuple(queue_id, 0, data_pit_result::success);
         return consumer_id;
     }
 
@@ -163,20 +219,20 @@ public:
         get_queue_size(queue_id) = size;
     }
 
-    data_pit_error get_last_error(unsigned int consumer_id)
+    data_pit_result get_last_error(unsigned int consumer_id)
     {
         std::lock_guard lock(m_mtx);
         // check if consumer_id exists
         if (m_consumers_data.find(consumer_id) == m_consumers_data.end())
         {
-            return data_pit_error::consumer_not_found;
+            return data_pit_result::consumer_not_found;
         }
         return get_data_pit_error(consumer_id);
     }
 
 private:
 
-    void set_last_error(unsigned int consumer_id, data_pit_error error)
+    void set_last_error(unsigned int consumer_id, data_pit_result error)
     {
         std::lock_guard lock(m_mtx);
 
@@ -218,7 +274,7 @@ private:
         return std::get<3>(m_queues_data.at(queue_id));
     }
 
-    inline data_pit_error& get_data_pit_error(unsigned int consumer_id)
+    inline data_pit_result& get_data_pit_error(unsigned int consumer_id)
     {
         return std::get<2>(m_consumers_data.at(consumer_id));
     }
@@ -247,12 +303,18 @@ private:
         released_ids.push(consumer_id);
     }
 
+    // Type aliases for data structure to store the data for each queue
     typedef std::tuple<std::pair<std::vector<std::any>, size_t>, std::string, std::mutex, std::condition_variable> data_t;
+    // Type aliases for queue id
     typedef int queue_id_t;
+    // Type aliases for consumer id
     typedef unsigned int consumer_id_t;
+    // Type aliases for index
     typedef size_t index_t;
-    typedef std::tuple<queue_id_t, index_t, data_pit_error> consumer_data_t;
+    // Type aliases for data structure to store the data for each consumer
+    typedef std::tuple<queue_id_t, index_t, data_pit_result> consumer_data_t;
 
+    // Data structure to store the data for each queue
     std::unordered_map<queue_id_t, data_t> m_queues_data;
     std::unordered_map<consumer_id_t, consumer_data_t> m_consumers_data;
     std::recursive_mutex m_mtx;
