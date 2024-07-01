@@ -15,10 +15,6 @@ seamless data flow between producers and consumers.
 
 - Multithreading was not tested extensively. Please report any issues you encounter.
 
-## Version
-
-- Current version: 1.0.0
-
 ## Getting Started
 
 To use data_pit in your C++ project, include the `data_pit.h` header file in your source code.
@@ -36,20 +32,25 @@ Here is a basic example of how to use data_pit:
 data_pit dp;
 
 // Register a consumer and get its ID
-unsigned int consumer_id = dp.register_consumer(queue_id);
+unsigned int consumer_id = dp.register_consumer(0);
 std::cout << "Registered consumer with ID: " << consumer_id << std::endl;
 
 // Produce some data
-dp.produce(0, "Hello, World!");
+std::string data_string = "Hello, World!";
+dp.produce(0, data_string);
 
 // Consume the data
 auto data = dp.consume<std::string>(consumer_id);
+if(data.has_value())
 std::cout << "Consumed data: " << data.value() << std::endl;
 
-
 // Unregister the consumer
-dp.unregister_id(consumer_id);
+dp.unregister_consumer(consumer_id);
 ```
+
+## Version
+
+- Current version: 1.0.0
 
 ## Contributing
 
