@@ -1,8 +1,31 @@
-//
-// Created by Salvatore Rivieccio on 25/06/24.
-//
+/*
+ *  unit_test.cpp
+ *  data_pit
+ *
+ *  Copyright (c) 2024 Salvatore Rivieccio. All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 #include <gtest/gtest.h>
 #include <thread>
+#include <atomic>
+#include <list>
 #include <data_pit.h>
 
 enum queue_id
@@ -331,6 +354,92 @@ TEST(data_pit, test_produce_consume_error)
     ASSERT_EQ(consumer_id, 1);
     auto result = dp.consume<int>(consumer_id);
     ASSERT_TRUE(result.has_value());
+}
+
+TEST(data_pit, test_multi_threading)
+{
+    data_pit dp;
+    std::atomic_int counter = 0;
+    std::list<std::thread> threads;
+    for(auto i = 0; i < 10; ++i)
+    {
+        threads.emplace_back([&dp, &counter]()
+        {
+            for(auto j = 0; j < 10; ++j)
+            {
+                dp.produce(queue_1, counter.fetch_add(1));
+            }
+        });
+    }
+    for(auto i = 0; i < 10; ++i)
+    {
+        threads.emplace_back([&dp]()
+        {
+            auto consumer_id = dp.register_consumer(queue_1);
+            std::list<int> results;
+            for(auto j = 0; j < 100; ++j)
+            {
+                auto result = dp.consume<int>(consumer_id, true);
+                if(result.has_value())
+                {
+                    results.push_back(result.value());
+                }
+            }
+            results.sort();
+            for(auto i = 0; i < 100; ++i)
+            {
+                ASSERT_EQ(i, results.front());
+                results.pop_front();
+            }
+        });
+    }
+    for(auto &t : threads)
+    {
+        t.join();
+    }
+}
+
+TEST(data_pit, test_multi_thread_multi_queue)
+{
+    data_pit dp;
+
+    std::list<std::thread> threads;
+    for(auto i = 0; i < 10; ++i)
+    {
+        threads.emplace_back([&dp, i]()
+        {
+            for(auto j = 0; j < 100; ++j)
+            {
+                dp.produce(i, j);
+            }
+        });
+    }
+    for(auto i = 0; i < 10; ++i)
+    {
+        threads.emplace_back([&dp, i]()
+        {
+            auto consumer_id = dp.register_consumer(i);
+            std::list<int> results;
+            for(auto j = 0; j < 100; ++j)
+            {
+                auto result = dp.consume<int>(consumer_id, true);
+                if(result.has_value())
+                {
+                    results.push_back(result.value());
+                }
+            }
+
+            for(auto j = 0; j < 100; ++j)
+            {
+                ASSERT_EQ(j, results.front());
+                results.pop_front();
+            }
+        });
+    }
+    for(auto &t : threads)
+    {
+        t.join();
+    }
 }
 
 int main(int argc, char **argv)
