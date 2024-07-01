@@ -51,7 +51,7 @@ void string_example()
 int main()
 {
     data_pit dp; // Create an instance of DataPit
-    int queue_id = 1; // The queue ID
+    int queue_id = 0; // The queue ID
 
     // Register a consumer and get its ID
     unsigned int consumer_id = dp.register_consumer(queue_id);
@@ -67,7 +67,7 @@ int main()
     // Consume the data
     for(int i = 0; i < 10; ++i)
     {
-        std::optional<int> data = dp.consume<int>(consumer_id);
+        std::optional<int> data = dp.consume<int>(consumer_id, true, 1000);
         if(data.has_value())
         {
             std::cout << "Consumed data: " << data.value() << std::endl;
