@@ -42,7 +42,7 @@ dp.produce(0, data_string);
 // Consume the data
 auto data = dp.consume<std::string>(consumer_id);
 if(data.has_value())
-std::cout << "Consumed data: " << data.value() << std::endl;
+  std::cout << "Consumed data: " << data.value() << std::endl;
 
 // Unregister the consumer
 dp.unregister_consumer(consumer_id);
