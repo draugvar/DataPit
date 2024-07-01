@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(datapit)
+project(data_pit)
 
 set(CMAKE_CXX_STANDARD 20)
 
