@@ -26,6 +26,28 @@
 #include "data_pit.h" // Include the header file for DataPit
 #include <iostream>
 
+void string_example()
+{
+    // Create a data_pit instance
+    data_pit dp;
+
+    // Register a consumer and get its ID
+    unsigned int consumer_id = dp.register_consumer(0);
+    std::cout << "Registered consumer with ID: " << consumer_id << std::endl;
+
+    // Produce some data
+    std::string data_string = "Hello, World!";
+    dp.produce(0, data_string);
+
+    // Consume the data
+    auto data = dp.consume<std::string>(consumer_id);
+    if(data.has_value())
+        std::cout << "Consumed data: " << data.value() << std::endl;
+
+    // Unregister the consumer
+    dp.unregister_consumer(consumer_id);
+}
+
 int main()
 {
     data_pit dp; // Create an instance of DataPit
@@ -59,6 +81,9 @@ int main()
     // Unregister the consumer
     dp.unregister_consumer(consumer_id);
     std::cout << "Unregistered consumer with ID: " << consumer_id << std::endl;
+
+    // Run the string example
+    string_example();
 
     return 0;
 }
