@@ -25,13 +25,14 @@
 #pragma once
 
 #include <queue>
-#include <unordered_map>
 #include <mutex>
 #include <condition_variable>
 #include <optional>
 #include <any>
 #include <chrono>
 #include <typeindex>
+
+#include "concurrent_unordered_map.h"
 
 #define DATA_PIT_VERSION_MAJOR 1
 #define DATA_PIT_VERSION_MINOR 0
@@ -279,7 +280,7 @@ public:
         std::unique_lock lock(m_mtx);
 
         // Check if consumer_id exists
-        if (m_consumers_data.find(consumer_id) == m_consumers_data.end()) return;
+        if (!m_consumers_data.find(consumer_id).has_value()) return;
 
         // Reset the consumer's index in the queue to 0
         std::get<1>(m_consumers_data[consumer_id]) = 0;
@@ -317,7 +318,7 @@ public:
         std::unique_lock lock(m_mtx);
 
         // Check if consumer_id exists
-        if (m_consumers_data.find(consumer_id) == m_consumers_data.end())
+        if (!m_consumers_data.find(consumer_id).has_value())
         {
             // If the consumer_id does not exist, return a consumer not found error
             return data_pit_result::consumer_not_found;
@@ -340,7 +341,7 @@ private:
         std::unique_lock lock(m_mtx);
 
         // Check if consumer_id exists
-        if (m_consumers_data.find(consumer_id) == m_consumers_data.end()) return;
+        if (!m_consumers_data.find(consumer_id).has_value()) return;
 
         // Set the last error of the consumer
         data_pit_error(consumer_id) = error;
@@ -368,7 +369,8 @@ private:
      */
     inline std::vector<std::any>& queue(int queue_id)
     {
-        return std::get<0>(m_queues_data[queue_id]).first;
+        auto &queue_data = m_queues_data.at(queue_id);
+        return std::get<0>(queue_data).first;
     }
 
     /**
@@ -378,7 +380,8 @@ private:
      */
     inline size_t& queue_size(int queue_id)
     {
-        return std::get<0>(m_queues_data[queue_id]).second;
+        auto &queue_data = m_queues_data.at(queue_id);
+        return std::get<0>(queue_data).second;
     }
 
     /**
@@ -389,7 +392,8 @@ private:
     inline std::string& queue_type(int queue_id)
     {
         // Return the type of the data in the queue
-        return std::get<1>(m_queues_data[queue_id]);
+        auto &queue_data = m_queues_data.at(queue_id);
+        return std::get<1>(queue_data);
     }
 
     /**
@@ -399,7 +403,8 @@ private:
      */
     inline std::mutex* queue_mutex(int queue_id)
     {
-        return std::get<2>(m_queues_data[queue_id]).get();
+        auto &queue_data = m_queues_data.at(queue_id);
+        return std::get<2>(queue_data).get();
     }
 
     /**
@@ -409,7 +414,8 @@ private:
      */
     inline std::condition_variable& queue_cv(int queue_id)
     {
-        return std::get<3>(m_queues_data[queue_id]);
+        auto &queue_data = m_queues_data.at(queue_id);
+        return std::get<3>(queue_data);
     }
 
     /**
@@ -491,9 +497,9 @@ private:
     typedef std::tuple<queue_id_t, index_t, data_pit_result> consumer_data_t;
 
     // Data structure to store the data for each queue
-    std::unordered_map<queue_id_t, data_t> m_queues_data;
+    concurrent_unordered_map<queue_id_t, data_t> m_queues_data;
     // Data structure to store the data for each consumer
-    std::unordered_map<consumer_id_t, consumer_data_t> m_consumers_data;
+    concurrent_unordered_map<consumer_id_t, consumer_data_t> m_consumers_data;
     // Mutex for thread safety
     std::mutex m_mtx;
     // Next consumer ID
