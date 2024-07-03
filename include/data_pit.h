@@ -146,10 +146,9 @@ public:
         // Check if the queue_id exists
         if (m_queues_data.contains(queue_id))
         {
-            while(queue_type(queue_id).empty())
-            {
-                // TODO FIXME - This should be removed but for now it is necessary to avoid a type mismatch error
-            }
+            // TODO FIXME - This is a temporary fix to avoid empty strings
+            while (queue_type(queue_id).empty());
+
             if(queue_type(queue_id) != std::type_index(typeid(T)).name())
             {
                 lock.unlock();
@@ -373,8 +372,7 @@ private:
      */
     inline std::vector<std::any>& queue(int queue_id)
     {
-        auto &queue_data = m_queues_data.at(queue_id);
-        return std::get<0>(queue_data).first;
+        return std::get<0>(m_queues_data.at(queue_id)).first;
     }
 
     /**
@@ -384,8 +382,7 @@ private:
      */
     inline size_t& queue_size(int queue_id)
     {
-        auto &queue_data = m_queues_data.at(queue_id);
-        return std::get<0>(queue_data).second;
+        return std::get<0>( m_queues_data.at(queue_id)).second;
     }
 
     /**
@@ -395,9 +392,7 @@ private:
      */
     inline std::string& queue_type(int queue_id)
     {
-        // Return the type of the data in the queue
-        auto &queue_data = m_queues_data.at(queue_id);
-        return std::get<1>(queue_data);
+        return std::get<1>(m_queues_data.at(queue_id));
     }
 
     /**
@@ -407,8 +402,7 @@ private:
      */
     inline std::mutex* queue_mutex(int queue_id)
     {
-        auto &queue_data = m_queues_data.at(queue_id);
-        return std::get<2>(queue_data).get();
+        return std::get<2>(m_queues_data.at(queue_id)).get();
     }
 
     /**
@@ -418,8 +412,7 @@ private:
      */
     inline std::condition_variable& queue_cv(int queue_id)
     {
-        auto &queue_data = m_queues_data.at(queue_id);
-        return std::get<3>(queue_data);
+        return std::get<3>(m_queues_data.at(queue_id));
     }
 
     /**
