@@ -73,18 +73,7 @@ public:
     Value& at(const Key& key)
     {
         std::shared_lock lock(mutex);
-        try
-        {
-            return map.at(key);
-        }
-        catch (const std::out_of_range& e) {
-            throw std::out_of_range("Key not found");
-        }
-        catch (const std::exception& e)
-        {
-            std::cout << "Caught an exception of an unexpected type: " << e.what() << std::endl;
-            throw std::exception();
-        }
+        return map.at(key);
     }
 
     void clear()
