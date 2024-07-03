@@ -28,22 +28,34 @@
 #include <mutex>
 #include <shared_mutex>
 
+/**
+ * @brief A concurrent hash map.
+ *
+ * @tparam Key The key type.
+ * @tparam Value The value type.
+ */
 template <typename Key, typename Value>
 class concurrent_hash_map
 {
 public:
-    void insert(const Key& key, const Value& value)
-    {
-        std::unique_lock lock(mutex);
-        map[key] = value;
-    }
-
+    /**
+     * @brief           Erase a key-value pair into the map.
+     *
+     * @param key       The key.
+     * @return          True if the key-value pair was erased, false otherwise.
+     */
     bool erase(const Key& key)
     {
         std::unique_lock lock(mutex);
         return map.erase(key);
     }
 
+    /**
+     * @brief           Find a key-value pair into the map.
+     *
+     * @param key       The key.
+     * @return          The value if the key was found, std::nullopt otherwise.
+     */
     std::optional<Value> find(const Key& key) const
     {
         std::shared_lock lock(mutex);
@@ -58,24 +70,45 @@ public:
         }
     }
 
+    /**
+     * @brief           Check if the map contains a key.
+     *
+     * @param key       The key.
+     * @return          True if the key was found, false otherwise.
+     */
     bool contains(const Key& key) const
     {
         std::shared_lock lock(mutex);
         return map.find(key) != map.end();
     }
 
+    /**
+     * @brief           Operator[] overload to access the map.
+     *
+     * @param key       The key.
+     * @return          The value.
+     */
     Value& operator[](const Key& key)
     {
         std::unique_lock lock(mutex);
         return map[key];
     }
 
+    /**
+     * @brief           Return a reference to the value associated with the key.
+     *
+     * @param key       The key.
+     * @return          The value.
+     */
     Value& at(const Key& key)
     {
         std::shared_lock lock(mutex);
         return map.at(key);
     }
 
+    /**
+     * @brief           Clear the map.
+     */
     void clear()
     {
         std::unique_lock lock(mutex);
@@ -83,6 +116,8 @@ public:
     }
 
 private:
+    // The map
     std::unordered_map<Key, Value> map;
+    // The mutex
     mutable std::shared_mutex mutex;
 };
