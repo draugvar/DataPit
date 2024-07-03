@@ -32,7 +32,7 @@
 #include <chrono>
 #include <typeindex>
 
-#include "concurrent_unordered_map.h"
+#include "concurrent_hash_map.h"
 
 #define DATA_PIT_VERSION_MAJOR 1
 #define DATA_PIT_VERSION_MINOR 0
@@ -146,6 +146,10 @@ public:
         // Check if the queue_id exists
         if (m_queues_data.contains(queue_id))
         {
+            while(queue_type(queue_id).empty())
+            {
+                // TODO FIXME - This should be removed but for now it is necessary to avoid a type mismatch error
+            }
             if(queue_type(queue_id) != std::type_index(typeid(T)).name())
             {
                 lock.unlock();
@@ -497,9 +501,9 @@ private:
     typedef std::tuple<queue_id_t, index_t, data_pit_result> consumer_data_t;
 
     // Data structure to store the data for each queue
-    concurrent_unordered_map<queue_id_t, data_t> m_queues_data;
+    concurrent_hash_map<queue_id_t, data_t> m_queues_data;
     // Data structure to store the data for each consumer
-    concurrent_unordered_map<consumer_id_t, consumer_data_t> m_consumers_data;
+    concurrent_hash_map<consumer_id_t, consumer_data_t> m_consumers_data;
     // Mutex for thread safety
     std::mutex m_mtx;
     // Next consumer ID
