@@ -401,44 +401,47 @@ TEST(data_pit, test_multi_threading)
 
 TEST(data_pit, test_multi_thread_multi_queue)
 {
-    data_pit dp;
+    for(auto iterations = 0; iterations < 10; ++iterations)
+    {
+        data_pit dp;
 
-    std::list<std::thread> threads;
-    for(auto i = 0; i < 10; ++i)
-    {
-        threads.emplace_back([&dp, i]()
+        std::list<std::thread> threads;
+        for(auto i = 0; i < 10; ++i)
         {
-            for(auto j = 0; j < 100; ++j)
+            threads.emplace_back([&dp, i]()
             {
-                dp.produce(i, j);
-            }
-        });
-    }
-    for(auto i = 0; i < 10; ++i)
-    {
-        threads.emplace_back([&dp, i]()
-        {
-            auto consumer_id = dp.register_consumer(i);
-            std::list<int> results;
-            for(auto j = 0; j < 100; ++j)
-            {
-                auto result = dp.consume<int>(consumer_id, true);
-                if(result.has_value())
+                for(auto j = 0; j < 100; ++j)
                 {
-                    results.push_back(result.value());
+                    ASSERT_EQ(dp.produce(i, j), data_pit_result::success);
                 }
-            }
-
-            for(auto j = 0; j < 100; ++j)
+            });
+        }
+        for(auto i = 0; i < 10; ++i)
+        {
+            threads.emplace_back([&dp, i]()
             {
-                ASSERT_EQ(j, results.front());
-                results.pop_front();
-            }
-        });
-    }
-    for(auto &t : threads)
-    {
-        t.join();
+                auto consumer_id = dp.register_consumer(i);
+                std::list<int> results;
+                for(auto j = 0; j < 100; ++j)
+                {
+                    auto result = dp.consume<int>(consumer_id, true);
+                    if(result.has_value())
+                    {
+                        results.push_back(result.value());
+                    }
+                }
+
+                for(auto j = 0; j < 100; ++j)
+                {
+                    ASSERT_EQ(j, results.front());
+                    results.pop_front();
+                }
+            });
+        }
+        for(auto &t : threads)
+        {
+            t.join();
+        }
     }
 }
 
