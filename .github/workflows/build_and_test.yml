@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            ./Release/unit_test.exe
+            ./Release/unit_test.exe --gtest_repeat=10
           else
-            ./unit_test
+            ./unit_test --gtest_repeat=10
           fi
