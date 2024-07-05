@@ -445,6 +445,26 @@ TEST(data_pit, test_multi_thread_multi_queue)
     }
 }
 
+TEST(data_pit, complex_object)
+{
+    struct complex_object
+    {
+        int a;
+        float b;
+        std::string c;
+    };
+
+    data_pit dp;
+    auto consumer_id = dp.register_consumer(queue_1);
+    complex_object obj = {42, 3.14f, "Hello, World!"};
+    dp.produce(queue_1, obj);
+    auto result = dp.consume<complex_object>(consumer_id);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(obj.a, result.value().a);
+    ASSERT_EQ(obj.b, result.value().b);
+    ASSERT_EQ(obj.c, result.value().c);
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
