@@ -25,7 +25,6 @@
 #pragma once
 
 #include <queue>
-#include <mutex>
 #include <condition_variable>
 #include <optional>
 #include <any>
@@ -76,7 +75,7 @@ public:
      * @return              The result of the operation
      */
     template<typename T>
-    data_pit_result produce(int queue_id, const T& data)
+    data_pit_result produce(const int queue_id, const T& data)
     {
         // Lock the mutex to ensure thread safety
         std::unique_lock global_lock(m_mtx);
@@ -127,8 +126,8 @@ public:
      * @return              The consumed data, or std::nullopt if no data are available
      */
     template<typename T>
-    std::optional<T> consume(unsigned int consumer_id, bool blocking = false,
-                             uint32_t timeout_ms = std::numeric_limits<uint32_t>::max())
+    std::optional<T> consume(const unsigned int consumer_id, const bool blocking = false,
+                             const uint32_t timeout_ms = std::numeric_limits<uint32_t>::max())
     {
         // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
@@ -141,13 +140,13 @@ public:
             return std::nullopt;
         }
 
-        auto queue_id = std::get<0>(m_consumers_data.at(consumer_id));
+        const auto queue_id = std::get<0>(m_consumers_data.at(consumer_id));
 
         // Check if the queue_id exists
         if (m_queues_data.contains(queue_id))
         {
             // TODO FIXME - This is a temporary fix to avoid empty strings
-            while (queue_type(queue_id).empty());
+            while (queue_type(queue_id).empty()) {}
 
             if(queue_type(queue_id) != std::type_index(typeid(T)).name())
             {
@@ -216,7 +215,7 @@ public:
     unsigned int register_consumer(int queue_id)
     {
         // Register a new consumer and get its ID
-        unsigned int consumer_id = register_id();
+        const unsigned int consumer_id = register_id();
 
         // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
@@ -236,7 +235,7 @@ public:
      * @brief               This function is used to unregister a consumer from a queue
      * @param   consumer_id The id of the consumer to be unregistered
      */
-    void unregister_consumer(unsigned int consumer_id)
+    void unregister_consumer(const unsigned int consumer_id)
     {
         // Release the consumer_id for future use
         unregister_id(consumer_id);
@@ -252,7 +251,7 @@ public:
      * @brief               This function is used to clear a specific queue
      * @param   queue_id    The id of the queue to be cleared
      */
-    void clear_queue(int queue_id)
+    void clear_queue(const int queue_id)
     {
         // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
@@ -277,7 +276,7 @@ public:
      * @brief               This function is used to reset a consumer's position in the queue
      * @param   consumer_id The id of the consumer to be reset
      */
-    void reset_consumer(unsigned int consumer_id)
+    void reset_consumer(const unsigned int consumer_id)
     {
         // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
@@ -294,7 +293,7 @@ public:
      * @param   queue_id    The id of the queue
      * @param   size        The maximum size of the queue
      */
-    void set_queue_size(int queue_id, size_t size)
+    void set_queue_size(const int queue_id, const size_t size)
     {
         // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
@@ -315,7 +314,7 @@ public:
      * @param   consumer_id The id of the consumer
      * @return              The last error of the consumer
      */
-    data_pit_result get_last_error(unsigned int consumer_id)
+    data_pit_result get_last_error(const unsigned int consumer_id)
     {
         // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
@@ -338,7 +337,7 @@ private:
      * @param   consumer_id The id of the consumer
      * @param   error       The error to be set
      */
-    void set_last_error(unsigned int consumer_id, data_pit_result error)
+    void set_last_error(const unsigned int consumer_id, const data_pit_result error)
     {
         // Lock the mutex to ensure thread safety
         std::unique_lock lock(m_mtx);
@@ -354,7 +353,7 @@ private:
      * @brief               This function is used to initialize a queue
      * @param   queue_id    The id of the queue
      */
-    inline void init_queue(int queue_id)
+    inline void init_queue(const int queue_id)
     {
         // Clear the vector and set the maximum size of the queue
         auto&[vector, size] = std::get<0>(m_queues_data[queue_id]);
@@ -370,7 +369,7 @@ private:
      * @param   queue_id    The id of the queue
      * @return              The queue
      */
-    inline std::vector<std::any>& queue(int queue_id)
+    inline std::vector<std::any>& queue(const int queue_id)
     {
         return std::get<0>(m_queues_data.at(queue_id)).first;
     }
@@ -380,7 +379,7 @@ private:
      * @param   queue_id    The id of the queue
      * @return              The maximum size of the queue
      */
-    inline size_t& queue_size(int queue_id)
+    inline size_t& queue_size(const int queue_id)
     {
         return std::get<0>( m_queues_data.at(queue_id)).second;
     }
@@ -390,7 +389,7 @@ private:
      * @param   queue_id    The id of the queue
      * @return              The type of the data in the queue
      */
-    inline std::string& queue_type(int queue_id)
+    inline std::string& queue_type(const int queue_id)
     {
         return std::get<1>(m_queues_data.at(queue_id));
     }
@@ -400,7 +399,7 @@ private:
      * @param   queue_id    The id of the queue
      * @return              The mutex for the queue
      */
-    inline std::mutex* queue_mutex(int queue_id)
+    inline std::mutex* queue_mutex(const int queue_id)
     {
         return std::get<2>(m_queues_data.at(queue_id)).get();
     }
@@ -410,7 +409,7 @@ private:
      * @param   queue_id    The id of the queue
      * @return              The condition variable for the queue
      */
-    inline std::condition_variable& queue_cv(int queue_id)
+    inline std::condition_variable& queue_cv(const int queue_id)
     {
         return std::get<3>(m_queues_data.at(queue_id));
     }
@@ -420,7 +419,7 @@ private:
      * @param   consumer_id The id of the consumer
      * @return              The index of the consumer
      */
-    inline size_t& consumer_index(unsigned int consumer_id)
+    inline size_t& consumer_index(const unsigned int consumer_id)
     {
         return std::get<1>(m_consumers_data.at(consumer_id));
     }
@@ -430,7 +429,7 @@ private:
      * @param   consumer_id The id of the consumer
      * @return              The last error of the consumer
      */
-    inline data_pit_result& data_pit_error(unsigned int consumer_id)
+    inline data_pit_result& data_pit_error(const unsigned int consumer_id)
     {
         return std::get<2>(m_consumers_data.at(consumer_id));
     }
@@ -475,7 +474,7 @@ private:
      * @brief               This function is used to unregister a specific consumer ID
      * @param   consumer_id The ID of the consumer to be unregistered
      */
-    void unregister_id(unsigned int consumer_id)
+    void unregister_id(const unsigned int consumer_id)
     {
         std::lock_guard lock(m_mtx);
         released_ids.push(consumer_id);
