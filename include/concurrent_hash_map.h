@@ -78,7 +78,7 @@ public:
     bool contains(const Key& key) const
     {
         std::shared_lock lock(mutex);
-        return map.find(key) != map.end();
+        return map.contains(key);
     }
 
     /**

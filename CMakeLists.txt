@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 include_directories(include)
 
 add_executable(${PROJECT_NAME}
-        example/main.cpp
+        example/DataPitExample.cpp
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
